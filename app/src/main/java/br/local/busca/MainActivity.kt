@@ -22,7 +22,6 @@ import android.view.inputmethod.EditorInfo
 import android.text.InputType
 import android.content.res.ColorStateList
 import android.graphics.drawable.RippleDrawable
-import android.view.WindowInsetsController
 import android.text.TextUtils
 import org.torproject.jni.TorService
 import com.arm.aichat.AiChat
@@ -132,7 +131,7 @@ class MainActivity : Activity() {
     }
     private fun showStartupError(error:Throwable){
         Log.e("BuscaLocal","Falha na inicialização da interface",error)
-        val diagnostic="BuscaLocal v0.3.2\n"+error.javaClass.name+"\n"+Log.getStackTraceString(error)
+        val diagnostic="BuscaLocal v0.3.3\n"+error.javaClass.name+"\n"+Log.getStackTraceString(error)
         val screen=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(24),dp(20),dp(20));setBackgroundColor(Color.WHITE)}
         screen.addView(label("Falha ao abrir o aplicativo",21f))
         screen.addView(label("O histórico e o modelo não foram apagados. Copie o diagnóstico para identificar a falha.",15f))
@@ -148,9 +147,7 @@ class MainActivity : Activity() {
         window.statusBarColor=white
         window.navigationBarColor=paper
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        window.insetsController?.setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
         rootFrame=FrameLayout(this).apply{setBackgroundColor(white)}
-        window.setDecorFitsSystemWindows(true)
         rootFrame.isFocusableInTouchMode=true
         chatScreen=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(paper)}
         rootFrame.addView(chatScreen,FrameLayout.LayoutParams(-1,-1))
@@ -192,7 +189,7 @@ class MainActivity : Activity() {
         val listHeader=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(8),dp(10),dp(8))}
         val brand=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         brand.addView(label("Busca Local",24f).apply{setTypeface(null,Typeface.BOLD);setTextColor(green)})
-        brand.addView(label("v0.3.2 • Conversas de pesquisa",12f).apply{setTextColor(muted)})
+        brand.addView(label("v0.3.3 • Conversas de pesquisa",12f).apply{setTextColor(muted)})
         listHeader.addView(brand,LinearLayout.LayoutParams(0,-2,1f))
         listHeader.addView(iconButton("plus","Nova conversa",true){newChat()},LinearLayout.LayoutParams(dp(46),dp(46)))
         listScreen.addView(listHeader)
@@ -200,6 +197,7 @@ class MainActivity : Activity() {
         listBody=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         listScreen.addView(ScrollView(this).apply{addView(listBody)},LinearLayout.LayoutParams(-1,0,1f))
         setContentView(rootFrame)
+        window.setDecorFitsSystemWindows(true)
         rootFrame.requestFocus()
         scroll.addOnLayoutChangeListener{_,_,top,_,bottom,_,oldTop,_,oldBottom->
             if(bottom-top<oldBottom-oldTop && query.hasFocus())scroll.post{scroll.scrollTo(0,maxOf(0,messages.height-scroll.height))}
@@ -251,7 +249,7 @@ class MainActivity : Activity() {
         messages.addView(wrapper,lp);scroll.post{scroll.scrollTo(0,maxOf(0,messages.height-scroll.height))};return t
     }
     private fun showMenu(){
-        AlertDialog.Builder(this).setTitle("Busca Local · v0.3.2").setItems(arrayOf("Selecionar modelo GGUF — "+modelLabel.text,"Nova conversa","Fontes desta conversa")){_,which->
+        AlertDialog.Builder(this).setTitle("Busca Local · v0.3.3").setItems(arrayOf("Selecionar modelo GGUF — "+modelLabel.text,"Nova conversa","Fontes desta conversa")){_,which->
             when(which){0->startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{type="*/*";addCategory(Intent.CATEGORY_OPENABLE)},7);1->newChat();2->showSources()}
         }.setNegativeButton("Fechar",null).show()
     }

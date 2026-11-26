@@ -40,15 +40,14 @@ jobs:
       - run: gradle :app:assembleDebug --no-daemon --stacktrace --max-workers=2
       - name: Verify native libraries and APK integrity
         run: |
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionName='0.3.2'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionName='0.3.3'"
           unzip -t app/build/outputs/apk/debug/app-debug.apk
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libai-chat.so'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libtor.so'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: BuscaLocal-v0.3.2-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+      - name: Preserve ARM64 APK for distribution
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/BuscaLocal-v0.3.3.apk
 
       - name: Build x86_64 UI smoke APK (not distributed)
         run: gradle :app:assembleDebug -PuiSmoke=true --no-daemon --max-workers=2
@@ -66,9 +65,14 @@ jobs:
           disable-animations: true
           script: bash tests/ui-smoke.sh app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
+        with:
+          name: BuscaLocal-v0.3.3-APK
+          path: dist/BuscaLocal-v0.3.3.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: BuscaLocal-v0.3.2-UI-diagnostics
+          name: BuscaLocal-v0.3.3-UI-diagnostics
           path: |
             ui-before.xml
             ui-after.xml

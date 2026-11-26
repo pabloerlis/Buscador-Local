@@ -16,11 +16,13 @@ dump(){
   done
   return 1
 }
-trap 'adb logcat -d -s AndroidRuntime BuscaLocal > ui-smoke-log.txt || true; adb shell screencap -p /sdcard/buscalocal-screen.png || true; adb pull /sdcard/buscalocal-screen.png ui-smoke.png >/dev/null 2>&1 || true' EXIT
+trap 'adb logcat -d -s AndroidRuntime BuscaLocal > ui-smoke-log.txt || true; cat ui-smoke-log.txt; adb shell screencap -p /sdcard/buscalocal-screen.png || true; adb pull /sdcard/buscalocal-screen.png ui-smoke.png >/dev/null 2>&1 || true' EXIT
 dump ui-before.xml
 read -r X Y BOTTOM < <(python3 - ui-before.xml <<'PY'
 import sys,re,xml.etree.ElementTree as E
-n=next(x for x in E.parse(sys.argv[1]).iter('node') if x.get('resource-id')=='br.local.busca:id/chat_message_input')
+nodes=list(E.parse(sys.argv[1]).iter('node'))
+assert not any('Falha ao abrir o aplicativo' in x.get('text','') for x in nodes), 'Tela de diagnóstico indica falha de inicialização'
+n=next(x for x in nodes if x.get('resource-id')=='br.local.busca:id/chat_message_input')
 a,b,c,d=map(int,re.findall(r'\d+',n.get('bounds')))
 print((a+c)//2,(b+d)//2,d)
 PY

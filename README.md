@@ -1,4 +1,4 @@
-# Buscador Local v0.3.2
+# Buscador Local v0.3.3
 Android ARM64 (11+), DuckDuckGo HTML, Tor incorporado obrigatório e GGUF local. Motor reutilizado do LFM3Local no commit 0e196e8831220b782cc78535b6d6729940169373. Sem servidor de inferência, conta ou Orbot. Modelo não incluído no APK. Sem modelo, busca e salva resultados e fontes. Com modelo, permite síntese e perguntas subsequentes. Não suporta PDFs ou sites dependentes de JavaScript. Não é uma ferramenta de anonimato auditada: verificar vazamentos DNS/IP e conexão real no aparelho. CAPTCHA ou bloqueio interrompem a pesquisa, sem fallback direto. Consultas são enviadas ao DuckDuckGo. Fontes são dados não confiáveis; citações e respostas exigem conferência.
 
 ## Build
@@ -47,3 +47,6 @@ A compilação 03 confirmou disponibilidade de SDK 37.2 e identificou incompatib
 - Falhas síncronas de inicialização mostram tela de diagnóstico copiável sem apagar dados. Falhas assíncronas ainda exigem logcat. Causa original não confirmada sem stack trace.
 - CI publica APK ARM64 e depois executa smoke test de interface em emulador API 35 com APK x86_64 separado, não distribuído. Verifica abertura, foco, digitação, deslocamento e fechamento do teclado. Não valida a inferência ARM64 nem o teclado Samsung.
 - Os testes geométricos do KeyboardLayout pertencem à implementação anterior e não são evidência de funcionamento do novo layout.
+
+## v0.3.3 — causa reproduzida em emulador
+O teste API 35 da v0.3.2 registrou NullPointerException em PhoneWindow.getInsetsController, chamado em MainActivity.createChatUi antes de setContentView. Removido acesso prematuro ao controlador; o tema define a aparência das barras. setDecorFitsSystemWindows é chamado somente após criar o conteúdo. Distribuição ARM64 agora condicionada à aprovação do smoke test de interface x86_64. O APK é preservado separadamente antes de gerar a variante de teste.
