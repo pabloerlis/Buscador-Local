@@ -3,7 +3,7 @@ val uiSmoke = providers.gradleProperty("uiSmoke").orNull == "true"
 android {
     namespace = "br.local.busca"
     compileSdk { version = release(37) { minorApiLevel = 2 } }
-    defaultConfig { applicationId = "br.local.busca"; minSdk = 30; targetSdk = 35; versionCode = 7; versionName = "0.3.3"; ndk { abiFilters += if (uiSmoke) "x86_64" else "arm64-v8a" } }
+    defaultConfig { applicationId = "br.local.busca"; minSdk = 30; targetSdk = 35; versionCode = 8; versionName = "0.4.0"; ndk { abiFilters += if (uiSmoke) "x86_64" else "arm64-v8a" } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
     packaging { jniLibs { useLegacyPackaging = true } }

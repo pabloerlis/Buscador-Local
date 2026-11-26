@@ -1,4 +1,4 @@
-# Buscador Local v0.3.3
+# Buscador Local v0.4.0
 Android ARM64 (11+), DuckDuckGo HTML, Tor incorporado obrigatório e GGUF local. Motor reutilizado do LFM3Local no commit 0e196e8831220b782cc78535b6d6729940169373. Sem servidor de inferência, conta ou Orbot. Modelo não incluído no APK. Sem modelo, busca e salva resultados e fontes. Com modelo, permite síntese e perguntas subsequentes. Não suporta PDFs ou sites dependentes de JavaScript. Não é uma ferramenta de anonimato auditada: verificar vazamentos DNS/IP e conexão real no aparelho. CAPTCHA ou bloqueio interrompem a pesquisa, sem fallback direto. Consultas são enviadas ao DuckDuckGo. Fontes são dados não confiáveis; citações e respostas exigem conferência.
 
 ## Build
@@ -50,3 +50,8 @@ A compilação 03 confirmou disponibilidade de SDK 37.2 e identificou incompatib
 
 ## v0.3.3 — causa reproduzida em emulador
 O teste API 35 da v0.3.2 registrou NullPointerException em PhoneWindow.getInsetsController, chamado em MainActivity.createChatUi antes de setContentView. Removido acesso prematuro ao controlador; o tema define a aparência das barras. setDecorFitsSystemWindows é chamado somente após criar o conteúdo. Distribuição ARM64 agora condicionada à aprovação do smoke test de interface x86_64. O APK é preservado separadamente antes de gerar a variante de teste.
+
+## v0.4.0 — inferência residente e resposta limpa
+- Pré-carrega GGUF salvo ao abrir, ou após importar, e mantém modelo residente enquanto o processo existir. Sem descarregar por turno. Contexto nativo da conversa ativa é reutilizado, fontes idênticas não são reenviadas; troca de conversa, erro, cancelamento ou limite de janela invalidam o contexto. Fallback reconstrói contexto e reduz evidências. Limites de evidências 2200/1100 caracteres, histórico frio 850, saída 384 tokens. Sem cache de várias conversas para limitar RAM.
+- Streaming visual limitado a atualizações a cada 90 ms; parser separa tags think/thinking/analysis, inclusive tags parciais. Resposta final visível; detalhes recolhidos, disponíveis por toque. Dados brutos mantidos localmente para reabrir detalhes. Prévia da conversa usa resposta limpa. Tags sem abertura só podem ser reconhecidas quando chega fechamento; não há garantia para pensamento sem marcação.
+- Menu Desempenho e detalhes mostram carregamentos, tempo de carga, preparação do contexto, primeira saída, primeira resposta visível e total. Contagem de fragmentos não equivale a tokens/s. Não há benchmark de inferência em ARM64 no CI; desempenho real precisa ser medido no aparelho. Android pode matar o processo sob pressão de memória.
