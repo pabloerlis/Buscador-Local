@@ -1,4 +1,4 @@
-# Buscador Local v0.3.0
+# Buscador Local v0.3.1
 Android ARM64 (11+), DuckDuckGo HTML, Tor incorporado obrigatório e GGUF local. Motor reutilizado do LFM3Local no commit 0e196e8831220b782cc78535b6d6729940169373. Sem servidor de inferência, conta ou Orbot. Modelo não incluído no APK. Sem modelo, busca e salva resultados e fontes. Com modelo, permite síntese e perguntas subsequentes. Não suporta PDFs ou sites dependentes de JavaScript. Não é uma ferramenta de anonimato auditada: verificar vazamentos DNS/IP e conexão real no aparelho. CAPTCHA ou bloqueio interrompem a pesquisa, sem fallback direto. Consultas são enviadas ao DuckDuckGo. Fontes são dados não confiáveis; citações e respostas exigem conferência.
 
 ## Build
@@ -36,3 +36,8 @@ A compilação 03 confirmou disponibilidade de SDK 37.2 e identificou incompatib
 - Tela dedicada de conversas com prévia de mensagens, avatar e contagem de fontes; acesso pelo ícone voltar. Identificação visível da versão na tela de conversas e no menu.
 - Cabeçalho branco, ícones desenhados em vetor, balões assimétricos, compositor em uma linha com globo de busca e envio circular. Indicadores técnicos aparecem durante o processamento e erros; modelo no menu. Resultados da busca condensados visualmente, mantendo fontes e histórico no SQLite.
 - Insets de barras e teclado tratados explicitamente. Sem alteração do banco ou motor. CI verifica versionName do APK. Não há captura de tela real nem execução física nesta infraestrutura.
+
+## v0.3.1 — teclado e compositor
+- Insets do IME e animação, com fallback pela área visível e compensação do redimensionamento já aplicado à janela. Compositor permanece abaixo da lista de mensagens, acima do teclado; ajuste de altura ocorre na lista.
+- Compositor compacto com campo sem contorno de foco, botão Web identificado, envio circular e paleta neutra. Mantém a lista de conversas da v0.3.0.
+- Testes de geometria do teclado no JVM; validação com teclado físico/virtual no Android ainda necessária.

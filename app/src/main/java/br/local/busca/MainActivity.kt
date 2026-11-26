@@ -28,6 +28,9 @@ import android.graphics.RectF
 import android.graphics.drawable.RippleDrawable
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.view.WindowInsetsAnimation
+import android.graphics.Rect
+import android.view.ViewTreeObserver
 import android.text.TextUtils
 import org.torproject.jni.TorService
 import com.arm.aichat.AiChat
@@ -66,12 +69,15 @@ class MainActivity : Activity() {
     private lateinit var listScreen:LinearLayout
     private lateinit var listBody:LinearLayout
     private var showingList=false
-    private val paper=Color.rgb(239,234,225)
+    private var latestInsets:WindowInsets?=null
+    private var layoutListener:ViewTreeObserver.OnGlobalLayoutListener?=null
+    private var keyboardVisible=false
+    private val paper=Color.rgb(242,245,241)
     private val white=Color.WHITE
     private val border=Color.rgb(225,230,227)
     private var phase="Preparação"
     private val cleanupScope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
-    private val green=Color.rgb(0,133,104)
+    private val green=Color.rgb(0,119,93)
     private val ink=Color.rgb(25,43,40)
     private val muted=Color.rgb(88,108,104)
     private val connection=object:ServiceConnection{
@@ -97,7 +103,7 @@ class MainActivity : Activity() {
             override fun onDraw(canvas:Canvas){
                 super.onDraw(canvas)
                 val size=dp(if(kind=="send")23 else 22).toFloat()
-                canvas.save();canvas.translate((width-size)/2f,(height-size)/2f);canvas.scale(size/24f,size/24f)
+                canvas.save();canvas.translate(if(kind=="web")dp(9).toFloat() else (width-size)/2f,(height-size)/2f);canvas.scale(size/24f,size/24f)
                 pen.color=if(filled)Color.WHITE else ink;pen.style=Paint.Style.STROKE;pen.strokeWidth=1.9f;pen.strokeCap=Paint.Cap.ROUND;pen.strokeJoin=Paint.Join.ROUND
                 fun line(a:Float,b:Float,c:Float,d:Float)=canvas.drawLine(a,b,c,d,pen)
                 when(kind){
@@ -110,6 +116,10 @@ class MainActivity : Activity() {
                     "plus"->{line(12f,5f,12f,19f);line(5f,12f,19f,12f)}
                 }
                 canvas.restore()
+                if(kind=="web"){
+                    pen.style=Paint.Style.FILL;pen.color=green;pen.textSize=dp(12).toFloat();pen.typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)
+                    canvas.drawText("Web",dp(34).toFloat(),height/2f-(pen.ascent()+pen.descent())/2f,pen)
+                }
             }
         }
     }
@@ -133,6 +143,23 @@ class MainActivity : Activity() {
         }
     }
     private fun newChat(){if(busy)return;chat=store.create();query.text.clear();showChatScreen()}
+    private fun updateWindowPadding(insets:WindowInsets?=latestInsets){
+        if(!::rootFrame.isInitialized)return
+        val bars=insets?.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+        val ime=insets?.getInsets(WindowInsets.Type.ime())
+        val position=IntArray(2)
+        rootFrame.getLocationOnScreen(position)
+        val visible=Rect()
+        rootFrame.getWindowVisibleDisplayFrame(visible)
+        val windowBottom=windowManager.currentWindowMetrics.bounds.bottom
+        val rootBottom=if(rootFrame.height>0)position[1]+rootFrame.height else windowBottom
+        val bottom=KeyboardLayout.bottomPadding(rootBottom,windowBottom,bars?.bottom ?: 0,ime?.bottom ?: 0,visible.bottom,dp(80))
+        val left=bars?.left ?: 0;val top=bars?.top ?: 0;val right=bars?.right ?: 0
+        if(rootFrame.paddingLeft!=left||rootFrame.paddingTop!=top||rootFrame.paddingRight!=right||rootFrame.paddingBottom!=bottom)rootFrame.setPadding(left,top,right,bottom)
+        val nowVisible=(insets?.isVisible(WindowInsets.Type.ime())==true)||(visible.bottom>0&&windowBottom-visible.bottom>dp(100))
+        if(nowVisible&&!keyboardVisible&&!showingList&&::scroll.isInitialized)scroll.post{scroll.fullScroll(View.FOCUS_DOWN)}
+        keyboardVisible=nowVisible
+    }
     @Deprecated("Legacy back handling")
     override fun onBackPressed(){if(busy){super.onBackPressed();return};if(showingList)super.onBackPressed() else showListScreen()}
     private fun step(name:String){phase=name;status.text=name}
@@ -149,11 +176,18 @@ class MainActivity : Activity() {
         window.insetsController?.setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
         rootFrame=FrameLayout(this).apply{setBackgroundColor(white)}
         window.setDecorFitsSystemWindows(false)
-        rootFrame.setOnApplyWindowInsetsListener{v,insets->
-            val bars=insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-            val ime=insets.getInsets(WindowInsets.Type.ime())
-            v.setPadding(bars.left,bars.top,bars.right,maxOf(bars.bottom,ime.bottom));insets
-        }
+        rootFrame.setOnApplyWindowInsetsListener{_,insets->latestInsets=insets;updateWindowPadding(insets);insets}
+        rootFrame.setWindowInsetsAnimationCallback(object:WindowInsetsAnimation.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE){
+            override fun onProgress(insets:WindowInsets,runningAnimations:MutableList<WindowInsetsAnimation>):WindowInsets{
+                latestInsets=insets;updateWindowPadding(insets);return insets
+            }
+            override fun onEnd(animation:WindowInsetsAnimation){
+                latestInsets=rootFrame.rootWindowInsets ?: latestInsets
+                updateWindowPadding()
+            }
+        })
+        layoutListener=ViewTreeObserver.OnGlobalLayoutListener{updateWindowPadding()}
+        rootFrame.viewTreeObserver.addOnGlobalLayoutListener(layoutListener!!)
         chatScreen=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(paper)}
         rootFrame.addView(chatScreen,FrameLayout.LayoutParams(-1,-1))
         val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(white);setPadding(dp(3),dp(4),dp(4),dp(4))}
@@ -176,12 +210,12 @@ class MainActivity : Activity() {
         chatScreen.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         status=label("",12f).apply{setTextColor(muted);setPadding(dp(14),dp(4),dp(14),dp(3));maxLines=2}
         chatScreen.addView(status)
-        val composer=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM;setPadding(dp(7),dp(3),dp(7),dp(7))}
-        val field=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM;background=shape(white,28);setPadding(dp(2),0,dp(3),0)}
-        query=EditText(this).apply{hint="Mensagem";maxLines=5;minLines=1;textSize=17f;setTextColor(ink);setHintTextColor(muted);background=null;setPadding(dp(15),dp(13),dp(3),dp(13));inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE;imeOptions=EditorInfo.IME_FLAG_NO_EXTRACT_UI}
+        val composer=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM;setPadding(dp(9),dp(7),dp(9),dp(9));setBackgroundColor(paper)}
+        val field=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM;background=shape(white,24,Color.rgb(224,231,225));setPadding(dp(2),dp(2),dp(5),dp(2));minimumHeight=dp(52)}
+        query=EditText(this).apply{hint="Digite uma mensagem";maxLines=4;minLines=1;textSize=16f;setTextColor(ink);setHintTextColor(muted);background=null;setPadding(dp(15),dp(13),dp(3),dp(13));inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE;imeOptions=EditorInfo.IME_FLAG_NO_EXTRACT_UI}
         field.addView(query,LinearLayout.LayoutParams(0,-2,1f))
-        search=iconButton("web","Buscar na web através do Tor"){runTurn(true)}
-        field.addView(search,LinearLayout.LayoutParams(dp(48),dp(48)))
+        search=iconButton("web","Buscar na web através do Tor"){runTurn(true)}.apply{background=ripple(Color.rgb(229,242,233),20)}
+        field.addView(search,LinearLayout.LayoutParams(dp(68),dp(38)).apply{setMargins(dp(3),0,0,dp(5))})
         composer.addView(field,LinearLayout.LayoutParams(0,-2,1f))
         talk=iconButton("send","Enviar mensagem ao modelo local",true){runTurn(false)}
         cancel=iconButton("stop","Cancelar operação",true){stopWork()}
@@ -194,7 +228,7 @@ class MainActivity : Activity() {
         val listHeader=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(8),dp(10),dp(8))}
         val brand=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         brand.addView(label("Busca Local",24f).apply{setTypeface(null,Typeface.BOLD);setTextColor(green)})
-        brand.addView(label("v0.3.0 • Conversas de pesquisa",12f).apply{setTextColor(muted)})
+        brand.addView(label("v0.3.1 • Conversas de pesquisa",12f).apply{setTextColor(muted)})
         listHeader.addView(brand,LinearLayout.LayoutParams(0,-2,1f))
         listHeader.addView(iconButton("plus","Nova conversa",true){newChat()},LinearLayout.LayoutParams(dp(46),dp(46)))
         listScreen.addView(listHeader)
@@ -232,7 +266,7 @@ class MainActivity : Activity() {
         val user=role=="user"||role=="search"
         val info=role=="info"
         val shown=if(info && body.startsWith("Resultados encontrados:")) "Busca concluída · "+body.lineSequence().drop(1).count()+" resultados. Consulte o ícone de fontes no topo." else body
-        val fill=if(user)Color.rgb(216,248,204) else if(info)Color.rgb(249,247,241) else white
+        val fill=if(user)Color.rgb(221,243,224) else if(info)Color.rgb(249,247,241) else white
         val wrapper=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL;setPadding(dp(11),dp(7),dp(11),dp(8))
             background=GradientDrawable().apply{setColor(fill);val r=dp(12).toFloat();val small=dp(3).toFloat();cornerRadii=if(user)floatArrayOf(r,r,small,small,r,r,r,r) else if(info)FloatArray(8){r} else floatArrayOf(small,small,r,r,r,r,r,r)}
@@ -250,7 +284,7 @@ class MainActivity : Activity() {
         messages.addView(wrapper,lp);scroll.post{scroll.fullScroll(View.FOCUS_DOWN)};return t
     }
     private fun showMenu(){
-        AlertDialog.Builder(this).setTitle("Busca Local · v0.3.0").setItems(arrayOf("Selecionar modelo GGUF — "+modelLabel.text,"Nova conversa","Fontes desta conversa")){_,which->
+        AlertDialog.Builder(this).setTitle("Busca Local · v0.3.1").setItems(arrayOf("Selecionar modelo GGUF — "+modelLabel.text,"Nova conversa","Fontes desta conversa")){_,which->
             when(which){0->startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{type="*/*";addCategory(Intent.CATEGORY_OPENABLE)},7);1->newChat();2->showSources()}
         }.setNegativeButton("Fechar",null).show()
     }
@@ -392,5 +426,5 @@ class MainActivity : Activity() {
             }
         }
     }
-    override fun onDestroy(){val r=research;cleanupScope.launch{r?.close()};scope.cancel();if(bound)unbindService(connection);super.onDestroy()}
+    override fun onDestroy(){layoutListener?.let{if(rootFrame.viewTreeObserver.isAlive)rootFrame.viewTreeObserver.removeOnGlobalLayoutListener(it)};val r=research;cleanupScope.launch{r?.close()};scope.cancel();if(bound)unbindService(connection);super.onDestroy()}
 }

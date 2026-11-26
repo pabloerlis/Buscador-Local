@@ -40,12 +40,12 @@ jobs:
       - run: gradle :app:assembleDebug --no-daemon --stacktrace --max-workers=2
       - name: Verify native libraries and APK integrity
         run: |
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionName='0.3.0'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionName='0.3.1'"
           unzip -t app/build/outputs/apk/debug/app-debug.apk
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libai-chat.so'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libtor.so'
       - uses: actions/upload-artifact@v4
         with:
-          name: BuscaLocal-v0.3.0-APK
+          name: BuscaLocal-v0.3.1-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
