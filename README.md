@@ -1,4 +1,4 @@
-# Buscador Local v0.3.1
+# Buscador Local v0.3.2
 Android ARM64 (11+), DuckDuckGo HTML, Tor incorporado obrigatório e GGUF local. Motor reutilizado do LFM3Local no commit 0e196e8831220b782cc78535b6d6729940169373. Sem servidor de inferência, conta ou Orbot. Modelo não incluído no APK. Sem modelo, busca e salva resultados e fontes. Com modelo, permite síntese e perguntas subsequentes. Não suporta PDFs ou sites dependentes de JavaScript. Não é uma ferramenta de anonimato auditada: verificar vazamentos DNS/IP e conexão real no aparelho. CAPTCHA ou bloqueio interrompem a pesquisa, sem fallback direto. Consultas são enviadas ao DuckDuckGo. Fontes são dados não confiáveis; citações e respostas exigem conferência.
 
 ## Build
@@ -41,3 +41,9 @@ A compilação 03 confirmou disponibilidade de SDK 37.2 e identificou incompatib
 - Insets do IME e animação, com fallback pela área visível e compensação do redimensionamento já aplicado à janela. Compositor permanece abaixo da lista de mensagens, acima do teclado; ajuste de altura ocorre na lista.
 - Compositor compacto com campo sem contorno de foco, botão Web identificado, envio circular e paleta neutra. Mantém a lista de conversas da v0.3.0.
 - Testes de geometria do teclado no JVM; validação com teclado físico/virtual no Android ainda necessária.
+
+## v0.3.2 — correção de inicialização
+- Remove desenho personalizado de botões e callbacks de animação/insets da v0.3.1. Utiliza ImageButton e vetores Android, tema compatível com targetSdk 35 e adjustResize nativo. Lista de conversas, SQLite, modelo e assinatura mantidos.
+- Falhas síncronas de inicialização mostram tela de diagnóstico copiável sem apagar dados. Falhas assíncronas ainda exigem logcat. Causa original não confirmada sem stack trace.
+- CI publica APK ARM64 e depois executa smoke test de interface em emulador API 35 com APK x86_64 separado, não distribuído. Verifica abertura, foco, digitação, deslocamento e fechamento do teclado. Não valida a inferência ARM64 nem o teclado Samsung.
+- Os testes geométricos do KeyboardLayout pertencem à implementação anterior e não são evidência de funcionamento do novo layout.

@@ -40,12 +40,39 @@ jobs:
       - run: gradle :app:assembleDebug --no-daemon --stacktrace --max-workers=2
       - name: Verify native libraries and APK integrity
         run: |
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionName='0.3.1'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionName='0.3.2'"
           unzip -t app/build/outputs/apk/debug/app-debug.apk
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libai-chat.so'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libtor.so'
       - uses: actions/upload-artifact@v4
         with:
-          name: BuscaLocal-v0.3.1-APK
+          name: BuscaLocal-v0.3.2-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Build x86_64 UI smoke APK (not distributed)
+        run: gradle :app:assembleDebug -PuiSmoke=true --no-daemon --max-workers=2
+      - name: Enable emulator KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Launch and type on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: bash tests/ui-smoke.sh app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: BuscaLocal-v0.3.2-UI-diagnostics
+          path: |
+            ui-before.xml
+            ui-after.xml
+            ui-closed.xml
+            ui-smoke-log.txt
+            ui-smoke.png
+          if-no-files-found: ignore
