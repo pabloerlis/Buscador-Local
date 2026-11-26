@@ -61,3 +61,11 @@ O teste API 35 da v0.3.2 registrou NullPointerException em PhoneWindow.getInsets
 - Registro local de ferramentas com JSON Schema e despacho JSON-RPC 2.0 com initialize, tools/list e tools/call (subconjunto MCP 2025-11-25, transporte em processo; sem servidores remotos/HTTP/stdio nesta versão). NativeToolSchema e retorno tool role se suportados pelo GGUF; fallback textual identificado para outros templates.
 - Até três chamadas por turno, sem chamadas duplicadas; validação de nome e argumento, resultado limitado a 650 caracteres. Tags de chamadas ocultas da UI. Não executa chamadas dentro de tags de pensamento. Sem acesso arbitrário a rede, shell, arquivos ou URLs.
 - Testes unitários do parser e smoke UI; escolha autônoma e chamadas nativas com GGUF real ainda exigem validação ARM64. Não afirma conformidade integral MCP nem suporte a servidores externos.
+
+## v0.5.1 — princípios de harness inspirados no Layla
+Referências públicas: https://help.layla-network.ai/how-saved-inference-engines-work-in-layla/ e https://help.layla-network.ai/how-to-enable-agents-functions-and-tool-calling-in-layla/ . Não usa código proprietário do Layla.
+- Perfis persistentes rápido/equilibrado/detalhado, limite de saída/chamadas e histórico. Habilitação individual de pesquisa web e fontes locais; preferência por template nativo do GGUF ou compatibilidade.
+- Histórico reconstruído com papéis reais, pares recentes e respostas sem tags de pensamento. Não injeta fontes em todo turno; ferramentas recuperam dados quando necessárias. KV ativo continua sendo reutilizado; raciocínio gerado pode permanecer no KV até a próxima reconstrução.
+- Resultados e atividades de ferramentas persistidos como eventos separados no SQLite sem migração. Exibição recolhida. Recuperação de contexto cheio após chamada preserva resultados coletados e evita nova busca idêntica. Retornos limitados por bytes UTF-8.
+- Patch local da dependência fixada: lista vazia desabilita modo nativo; rejeição por tamanho de retorno/limite contextual retorna estado ModelReady em vez de descarregar GGUF. Não altera o repositório LFM3Local.
+- Sem benchmark comparativo com Layla nem testes reais de inferência no CI. Perfis não alteram sampler ou threads do motor nesta versão.

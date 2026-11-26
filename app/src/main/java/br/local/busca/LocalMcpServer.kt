@@ -15,7 +15,7 @@ internal class LocalMcpServer(tools:List<LocalTool>){
         fun error(code:Int,message:String)=response.put("error",JSONObject().put("code",code).put("message",message))
         if(request.optString("jsonrpc")!="2.0")return error(-32600,"Requisição inválida")
         when(request.optString("method")){
-            "initialize" -> return response.put("result",JSONObject().put("protocolVersion","2025-11-25").put("capabilities",JSONObject().put("tools",JSONObject())).put("serverInfo",JSONObject().put("name","buscalocal").put("version","0.5.0")))
+            "initialize" -> return response.put("result",JSONObject().put("protocolVersion","2025-11-25").put("capabilities",JSONObject().put("tools",JSONObject())).put("serverInfo",JSONObject().put("name","buscalocal").put("version","0.5.1")))
             "tools/list" -> return response.put("result",JSONObject().put("tools",JSONArray(registry.values.map{JSONObject().put("name",it.name).put("description",it.description).put("inputSchema",JSONObject(it.schema))})))
             "tools/call" -> {
                 val params=request.optJSONObject("params")?:return error(-32602,"Parâmetros ausentes")
