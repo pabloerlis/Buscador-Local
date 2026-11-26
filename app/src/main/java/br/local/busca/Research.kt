@@ -11,7 +11,7 @@ internal class Research(port: Int) {
     init { require(port in 1..65535) }
     private val client = OkHttpClient.Builder()
         .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", port)))
-        .dns { throw UnknownHostException("DNS local desativado") }
+        .dns(object : Dns { override fun lookup(hostname: String): List<InetAddress> = throw UnknownHostException("DNS local desativado") })
         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
         .cookieJar(CookieJar.NO_COOKIES).connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS).callTimeout(40, TimeUnit.SECONDS).build()
