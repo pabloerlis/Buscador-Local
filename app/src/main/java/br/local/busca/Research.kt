@@ -65,5 +65,8 @@ internal class Research(port: Int) {
         if (passage.isBlank()) throw IOException("Sem texto extraído")
         return Evidence(hit.copy(url = finalUrl), passage)
     }
-    fun close() { client.dispatcher.cancelAll(); client.connectionPool.evictAll() }
+    fun close() {
+        check(android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) { "Fechamento de rede deve ocorrer em IO" }
+        client.dispatcher.cancelAll(); client.connectionPool.evictAll()
+    }
 }

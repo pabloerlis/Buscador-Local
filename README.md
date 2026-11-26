@@ -1,4 +1,4 @@
-# Buscador Local v0.2.0
+# Buscador Local v0.2.1
 Android ARM64 (11+), DuckDuckGo HTML, Tor incorporado obrigatório e GGUF local. Motor reutilizado do LFM3Local no commit 0e196e8831220b782cc78535b6d6729940169373. Sem servidor de inferência, conta ou Orbot. Modelo não incluído no APK. Sem modelo, busca e salva resultados e fontes. Com modelo, permite síntese e perguntas subsequentes. Não suporta PDFs ou sites dependentes de JavaScript. Não é uma ferramenta de anonimato auditada: verificar vazamentos DNS/IP e conexão real no aparelho. CAPTCHA ou bloqueio interrompem a pesquisa, sem fallback direto. Consultas são enviadas ao DuckDuckGo. Fontes são dados não confiáveis; citações e respostas exigem conferência.
 
 ## Build
@@ -25,3 +25,9 @@ A compilação 03 confirmou disponibilidade de SDK 37.2 e identificou incompatib
 - Botão Fontes mostra os textos salvos e URLs sem abrir navegador externo. Nova conversa não apaga anteriores.
 - A chave Debug da v0.1.0 não foi persistida. Pode ser necessário reinstalar; guarde o GGUF original. A partir desta versão o CI tenta preservar a chave em cache (não é garantia permanente).
 - Testes JVM incluem seleção, limite de contexto, recuperação de assuntos antigos e estabilidade de citações. Validar inferência e privacidade real no aparelho.
+
+## v0.2.1 — rede e interface
+- Corrige caminho provável de NetworkOnMainThreadException após salvar páginas: cancelamento e encerramento de conexões OkHttp passam para Dispatchers.IO, inclusive finally e lifecycle; checagem explícita impede close na thread principal. Consulta ao circuito também em IO. Não desativa StrictMode.
+- Aguarda inicialização do motor antes de carregar GGUF e registra etapa, tipo e stack trace de falhas via adb logcat -s BuscaLocal.
+- Cabeçalho compacto, bolhas alinhadas, compositor fixo, ações de envio local, busca Tor e parada; fontes e modelos acessíveis no cabeçalho. Mantém SQLite e package ID. Testar no aparelho, incluindo cancelar busca, reabrir conversa e conversar offline.
+- Causa exata do erro reportado não confirmada sem stack trace de dispositivo; build não comprova execução em smartphone.
