@@ -23,6 +23,12 @@ import android.text.InputType
 import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.drawable.RippleDrawable
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.text.TextUtils
 import org.torproject.jni.TorService
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
@@ -55,9 +61,17 @@ class MainActivity : Activity() {
     private lateinit var sources:Button
     private lateinit var cancel:Button
     private lateinit var headerTitle:TextView
+    private lateinit var rootFrame:FrameLayout
+    private lateinit var chatScreen:LinearLayout
+    private lateinit var listScreen:LinearLayout
+    private lateinit var listBody:LinearLayout
+    private var showingList=false
+    private val paper=Color.rgb(239,234,225)
+    private val white=Color.WHITE
+    private val border=Color.rgb(225,230,227)
     private var phase="Preparação"
     private val cleanupScope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
-    private val green=Color.rgb(0,105,91)
+    private val green=Color.rgb(0,133,104)
     private val ink=Color.rgb(25,43,40)
     private val muted=Color.rgb(88,108,104)
     private val connection=object:ServiceConnection{
@@ -67,8 +81,60 @@ class MainActivity : Activity() {
     private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
     private fun label(t:String,size:Float=14f)=TextView(this).apply{text=t;textSize=size;setTextColor(ink)}
     private fun shape(color:Int,radius:Int,stroke:Int?=null)=GradientDrawable().apply{cornerRadius=dp(radius).toFloat();setColor(color);stroke?.let{setStroke(dp(1),it)}}
-    private fun button(t:String,action:()->Unit)=Button(this).apply{text=t;isAllCaps=false;textSize=13f;minHeight=0;minimumHeight=0;minWidth=0;minimumWidth=0;setPadding(dp(9),0,dp(9),0);setTextColor(Color.WHITE);backgroundTintList=ColorStateList.valueOf(green);setOnClickListener{action()}}
-    private fun headerButton(t:String,desc:String,action:()->Unit)=button(t,action).apply{contentDescription=desc;setTextColor(Color.WHITE);backgroundTintList=ColorStateList.valueOf(Color.rgb(0,87,75));textSize=17f}
+    private fun ripple(color:Int,radius:Int=24)=RippleDrawable(ColorStateList.valueOf(Color.argb(30,0,90,65)),shape(color,radius),shape(Color.WHITE,radius))
+    private fun button(t:String,action:()->Unit)=Button(this).apply{
+        text=t;isAllCaps=false;textSize=14f;minHeight=0;minimumHeight=0;minWidth=0;minimumWidth=0
+        setPadding(dp(10),0,dp(10),0);setTextColor(white);background=ripple(green);stateListAnimator=null;setOnClickListener{action()}
+    }
+    private fun iconButton(kind:String,desc:String,filled:Boolean=false,action:()->Unit):Button {
+        return object:Button(this){
+            private val pen=Paint(Paint.ANTI_ALIAS_FLAG)
+            init{
+                contentDescription=desc;text="";minWidth=0;minimumWidth=0;minHeight=0;minimumHeight=0
+                setPadding(0,0,0,0);background=ripple(if(filled)green else Color.TRANSPARENT)
+                stateListAnimator=null;setOnClickListener{action()}
+            }
+            override fun onDraw(canvas:Canvas){
+                super.onDraw(canvas)
+                val size=dp(if(kind=="send")23 else 22).toFloat()
+                canvas.save();canvas.translate((width-size)/2f,(height-size)/2f);canvas.scale(size/24f,size/24f)
+                pen.color=if(filled)Color.WHITE else ink;pen.style=Paint.Style.STROKE;pen.strokeWidth=1.9f;pen.strokeCap=Paint.Cap.ROUND;pen.strokeJoin=Paint.Join.ROUND
+                fun line(a:Float,b:Float,c:Float,d:Float)=canvas.drawLine(a,b,c,d,pen)
+                when(kind){
+                    "back"->{line(18f,12f,5f,12f);line(5f,12f,11f,6f);line(5f,12f,11f,18f)}
+                    "more"->{pen.style=Paint.Style.FILL;for(y in listOf(5f,12f,19f))canvas.drawCircle(12f,y,1.6f,pen)}
+                    "sources"->{canvas.drawRoundRect(5f,4f,18f,20f,2f,2f,pen);line(8f,9f,15f,9f);line(8f,13f,15f,13f);line(8f,17f,13f,17f)}
+                    "web"->{pen.color=green;canvas.drawCircle(12f,12f,9f,pen);canvas.drawOval(RectF(8f,3f,16f,21f),pen);line(3f,12f,21f,12f);line(5f,7f,19f,7f);line(5f,17f,19f,17f)}
+                    "send"->{pen.style=Paint.Style.FILL;val path=Path().apply{moveTo(3f,3f);lineTo(22f,12f);lineTo(3f,21f);lineTo(6f,13.5f);lineTo(15f,12f);lineTo(6f,10.5f);close()};canvas.drawPath(path,pen)}
+                    "stop"->{pen.style=Paint.Style.FILL;canvas.drawRoundRect(6f,6f,18f,18f,2f,2f,pen)}
+                    "plus"->{line(12f,5f,12f,19f);line(5f,12f,19f,12f)}
+                }
+                canvas.restore()
+            }
+        }
+    }
+    private fun avatar(text:String,size:Int=44)=label(text,17f).apply{gravity=Gravity.CENTER;setTextColor(green);setTypeface(null,Typeface.BOLD);background=shape(Color.rgb(218,242,229),size)}
+    private fun showChatScreen(){showingList=false;listScreen.visibility=View.GONE;chatScreen.visibility=View.VISIBLE;renderChat();refresh()}
+    private fun showListScreen(){
+        if(busy)return
+        hideKeyboard();showingList=true;chatScreen.visibility=View.GONE;listScreen.visibility=View.VISIBLE;listBody.removeAllViews()
+        val list=store.chats()
+        for(c in list){
+            val item=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12));background=ripple(white,0);isClickable=true;setOnClickListener{chat=c.id;query.text.clear();showChatScreen()}}
+            item.addView(avatar(c.title.trim().take(1).uppercase().ifBlank{"B"}),LinearLayout.LayoutParams(dp(48),dp(48)).apply{setMargins(0,0,dp(13),0)})
+            val details=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+            details.addView(label(c.title,17f).apply{setTypeface(null,Typeface.BOLD);maxLines=1;ellipsize=TextUtils.TruncateAt.END})
+            val preview=store.preview(c.id)
+            details.addView(label(preview.ifBlank{"Nenhuma mensagem"},14f).apply{setTextColor(muted);maxLines=1;ellipsize=TextUtils.TruncateAt.END;setPadding(0,dp(4),0,0)})
+            item.addView(details,LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
+            item.addView(label(store.sourceCount(c.id).toString()+" fontes",11f).apply{setTextColor(green);setPadding(dp(8),0,0,0)})
+            listBody.addView(item)
+            listBody.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)).apply{setMargins(dp(77),0,0,0)})
+        }
+    }
+    private fun newChat(){if(busy)return;chat=store.create();query.text.clear();showChatScreen()}
+    @Deprecated("Legacy back handling")
+    override fun onBackPressed(){if(busy){super.onBackPressed();return};if(showingList)super.onBackPressed() else showListScreen()}
     private fun step(name:String){phase=name;status.text=name}
     private fun stopWork(){val r=research;cleanupScope.launch{r?.close()};job?.cancel();status.text="Cancelando…"}
     private fun hideKeyboard(){(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(query.windowToken,0)}
@@ -77,46 +143,66 @@ class MainActivity : Activity() {
         store=ChatStore(this)
         val saved=getPreferences(MODE_PRIVATE).getLong("chat",0)
         chat=store.chats().firstOrNull{it.id==saved}?.id ?: store.chats().firstOrNull()?.id ?: store.create()
-        window.statusBarColor=green
-        window.navigationBarColor=Color.rgb(239,243,239)
+        window.statusBarColor=white
+        window.navigationBarColor=paper
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(Color.rgb(237,233,224))}
-        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(green);setPadding(dp(7),dp(7),dp(7),dp(7))}
-        chats=headerButton("‹","Abrir conversas"){showChats()}
-        header.addView(chats,LinearLayout.LayoutParams(dp(44),dp(48)))
-        val avatar=label("B",19f).apply{gravity=Gravity.CENTER;setTextColor(green);setTypeface(null,Typeface.BOLD);background=shape(Color.rgb(215,237,228),50)}
-        header.addView(avatar,LinearLayout.LayoutParams(dp(40),dp(40)).apply{setMargins(dp(4),0,dp(9),0)})
+        window.insetsController?.setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
+        rootFrame=FrameLayout(this).apply{setBackgroundColor(white)}
+        window.setDecorFitsSystemWindows(false)
+        rootFrame.setOnApplyWindowInsetsListener{v,insets->
+            val bars=insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+            val ime=insets.getInsets(WindowInsets.Type.ime())
+            v.setPadding(bars.left,bars.top,bars.right,maxOf(bars.bottom,ime.bottom));insets
+        }
+        chatScreen=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(paper)}
+        rootFrame.addView(chatScreen,FrameLayout.LayoutParams(-1,-1))
+        val header=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setBackgroundColor(white);setPadding(dp(3),dp(4),dp(4),dp(4))}
+        chats=iconButton("back","Conversas"){showListScreen()}
+        header.addView(chats,LinearLayout.LayoutParams(dp(42),dp(48)))
+        header.addView(avatar("B"),LinearLayout.LayoutParams(dp(40),dp(40)).apply{setMargins(0,0,dp(10),0)})
         val heading=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_VERTICAL}
-        headerTitle=label("Busca Local",17f).apply{setTextColor(Color.WHITE);setTypeface(null,Typeface.BOLD);maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END}
-        network=label("Tor: conectando",11f).apply{setTextColor(Color.rgb(213,239,230));maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END}
+        headerTitle=label("Busca Local",17f).apply{setTypeface(null,Typeface.BOLD);maxLines=1;ellipsize=TextUtils.TruncateAt.END}
+        network=label("Conectando Tor",11f).apply{setTextColor(muted);maxLines=1;ellipsize=TextUtils.TruncateAt.END}
         heading.addView(headerTitle);heading.addView(network)
-        header.addView(heading,LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
-        sources=headerButton("0","Fontes desta conversa"){showSources()}.apply{textSize=13f}
-        choose=headerButton("⋮","Configurações e modelo"){showMenu()}
-        header.addView(sources,LinearLayout.LayoutParams(dp(52),dp(48)))
-        header.addView(choose,LinearLayout.LayoutParams(dp(40),dp(48)))
-        root.addView(header)
-        modelLabel=label("Modelo: não selecionado",11f).apply{setTextColor(muted);setPadding(dp(12),dp(5),dp(12),dp(2));setBackgroundColor(Color.rgb(247,250,246))}
-        root.addView(modelLabel)
-        status=label("",12f).apply{setTextColor(muted);setPadding(dp(12),dp(3),dp(12),dp(6));setBackgroundColor(Color.rgb(247,250,246));maxLines=2}
-        root.addView(status)
-        messages=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(8),dp(10),dp(10))}
+        header.addView(heading,LinearLayout.LayoutParams(0,-2,1f))
+        sources=iconButton("sources","Fontes desta conversa"){showSources()}
+        choose=iconButton("more","Configurações e modelo"){showMenu()}
+        header.addView(sources,LinearLayout.LayoutParams(dp(42),dp(48)));header.addView(choose,LinearLayout.LayoutParams(dp(40),dp(48)))
+        chatScreen.addView(header)
+        chatScreen.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)))
+        modelLabel=label("Modelo: não selecionado",11f) // apenas no menu, sem ocupar a conversa
+        messages=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(9),dp(12),dp(9),dp(12))}
         scroll=ScrollView(this).apply{isFillViewport=true;isVerticalScrollBarEnabled=false;addView(messages)}
-        root.addView(scroll,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f))
-        val composer=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM;setPadding(dp(8),dp(5),dp(8),dp(7));setBackgroundColor(Color.rgb(237,233,224))}
-        val field=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=shape(Color.WHITE,24);setPadding(dp(5),dp(2),dp(5),dp(2))}
-        query=EditText(this).apply{hint="Mensagem";maxLines=4;minLines=1;textSize=16f;setTextColor(ink);setHintTextColor(muted);background=null;setPadding(dp(12),dp(10),dp(12),dp(4));inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE;imeOptions=EditorInfo.IME_FLAG_NO_EXTRACT_UI}
-        field.addView(query,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT))
-        search=button("Buscar na web"){runTurn(true)}.apply{setTextColor(green);backgroundTintList=ColorStateList.valueOf(Color.rgb(226,241,234));contentDescription="Pesquisar no DuckDuckGo através do Tor";textSize=12f}
-        field.addView(search,LinearLayout.LayoutParams(dp(135),dp(36)).apply{gravity=Gravity.START;setMargins(dp(5),0,0,dp(3))})
-        composer.addView(field,LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
-        talk=button("➤"){runTurn(false)}.apply{contentDescription="Enviar mensagem ao modelo local";textSize=23f;background=shape(green,50);backgroundTintList=null}
-        cancel=button("■"){stopWork()}.apply{contentDescription="Cancelar operação";textSize=20f;background=shape(green,50);backgroundTintList=null}
-        val action=android.widget.FrameLayout(this)
-        action.addView(talk,android.widget.FrameLayout.LayoutParams(-1,-1));action.addView(cancel,android.widget.FrameLayout.LayoutParams(-1,-1))
-        composer.addView(action,LinearLayout.LayoutParams(dp(52),dp(52)).apply{setMargins(dp(7),0,0,dp(1))})
-        root.addView(composer)
-        setContentView(root)
+        chatScreen.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+        status=label("",12f).apply{setTextColor(muted);setPadding(dp(14),dp(4),dp(14),dp(3));maxLines=2}
+        chatScreen.addView(status)
+        val composer=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM;setPadding(dp(7),dp(3),dp(7),dp(7))}
+        val field=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM;background=shape(white,28);setPadding(dp(2),0,dp(3),0)}
+        query=EditText(this).apply{hint="Mensagem";maxLines=5;minLines=1;textSize=17f;setTextColor(ink);setHintTextColor(muted);background=null;setPadding(dp(15),dp(13),dp(3),dp(13));inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE;imeOptions=EditorInfo.IME_FLAG_NO_EXTRACT_UI}
+        field.addView(query,LinearLayout.LayoutParams(0,-2,1f))
+        search=iconButton("web","Buscar na web através do Tor"){runTurn(true)}
+        field.addView(search,LinearLayout.LayoutParams(dp(48),dp(48)))
+        composer.addView(field,LinearLayout.LayoutParams(0,-2,1f))
+        talk=iconButton("send","Enviar mensagem ao modelo local",true){runTurn(false)}
+        cancel=iconButton("stop","Cancelar operação",true){stopWork()}
+        val action=FrameLayout(this)
+        action.addView(talk,FrameLayout.LayoutParams(-1,-1));action.addView(cancel,FrameLayout.LayoutParams(-1,-1))
+        composer.addView(action,LinearLayout.LayoutParams(dp(50),dp(50)).apply{setMargins(dp(6),0,0,0)})
+        chatScreen.addView(composer)
+        listScreen=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(white);visibility=View.GONE}
+        rootFrame.addView(listScreen,FrameLayout.LayoutParams(-1,-1))
+        val listHeader=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(8),dp(10),dp(8))}
+        val brand=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        brand.addView(label("Busca Local",24f).apply{setTypeface(null,Typeface.BOLD);setTextColor(green)})
+        brand.addView(label("v0.3.0 • Conversas de pesquisa",12f).apply{setTextColor(muted)})
+        listHeader.addView(brand,LinearLayout.LayoutParams(0,-2,1f))
+        listHeader.addView(iconButton("plus","Nova conversa",true){newChat()},LinearLayout.LayoutParams(dp(46),dp(46)))
+        listScreen.addView(listHeader)
+        listScreen.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)))
+        listBody=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        listScreen.addView(ScrollView(this).apply{addView(listBody)},LinearLayout.LayoutParams(-1,0,1f))
+        setContentView(rootFrame)
+        rootFrame.requestApplyInsets()
         File(filesDir,"model.gguf").takeIf{it.isFile}?.let{modelFile=it;modelLabel.text="GGUF local: "+it.length()/1048576+" MiB"}
         renderChat()
         refresh()
@@ -130,7 +216,7 @@ class MainActivity : Activity() {
         }
     }
     private fun refresh(){
-        network.text=if(torReady)"Tor conectado · pesquisas via DuckDuckGo" else "Tor desconectado · chat local disponível"
+        network.text=(if(torReady)"Tor conectado" else "Tor offline")+" · "+(if(modelFile!=null)"IA local" else "sem modelo")
         talk.isEnabled=!busy && modelFile!=null
         search.isEnabled=!busy && torReady
         choose.isEnabled=!busy;chats.isEnabled=!busy;sources.isEnabled=!busy
@@ -140,35 +226,42 @@ class MainActivity : Activity() {
         talk.alpha=if(talk.isEnabled)1f else 0.45f
         search.alpha=if(search.isEnabled)1f else 0.5f
         query.isEnabled=!busy
+        status.visibility=if(busy || status.text.startsWith("Falha") || status.text.startsWith("Tor indisponível") || status.text.startsWith("Digite") || status.text.startsWith("Importe"))View.VISIBLE else View.GONE
     }
     private fun bubble(role:String,body:String):TextView{
-        val user=role=="user" || role=="search"
+        val user=role=="user"||role=="search"
         val info=role=="info"
-        val t=label("",if(info)12f else 16f).apply{
-            text=when(role){"search"->"Busca na web\n"+body;"assistant"->body;else->body}
-            setTextIsSelectable(true);setPadding(dp(12),dp(8),dp(12),dp(8))
-            setTextColor(if(info)muted else ink)
-            background=shape(if(user)Color.rgb(217,245,202) else if(info)Color.rgb(246,245,239) else Color.WHITE,if(info)14 else 10)
-            maxWidth=(resources.displayMetrics.widthPixels*if(info)0.83 else 0.86).toInt()
+        val shown=if(info && body.startsWith("Resultados encontrados:")) "Busca concluída · "+body.lineSequence().drop(1).count()+" resultados. Consulte o ícone de fontes no topo." else body
+        val fill=if(user)Color.rgb(216,248,204) else if(info)Color.rgb(249,247,241) else white
+        val wrapper=LinearLayout(this).apply{
+            orientation=LinearLayout.VERTICAL;setPadding(dp(11),dp(7),dp(11),dp(8))
+            background=GradientDrawable().apply{setColor(fill);val r=dp(12).toFloat();val small=dp(3).toFloat();cornerRadii=if(user)floatArrayOf(r,r,small,small,r,r,r,r) else if(info)FloatArray(8){r} else floatArrayOf(small,small,r,r,r,r,r,r)}
+            if(!info)elevation=dp(1).toFloat()
+        }
+        if(role=="search")wrapper.addView(label("Pesquisa na web",11f).apply{setTextColor(green);setTypeface(null,Typeface.BOLD);setPadding(0,0,0,dp(3))})
+        val t=label(shown,if(info)12f else 16f).apply{
+            setTextIsSelectable(true);setTextColor(if(info)muted else ink)
+            maxWidth=(resources.displayMetrics.widthPixels*(if(info)0.77 else 0.80)).toInt()
             if(info)gravity=Gravity.CENTER
             setLineSpacing(dp(2).toFloat(),1f)
         }
-        val lp=LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT).apply{gravity=if(info)Gravity.CENTER_HORIZONTAL else if(user)Gravity.END else Gravity.START;setMargins(dp(3),dp(3),dp(3),dp(3))}
-        messages.addView(t,lp);scroll.post{scroll.fullScroll(View.FOCUS_DOWN)};return t
+        wrapper.addView(t,LinearLayout.LayoutParams(-2,-2))
+        val lp=LinearLayout.LayoutParams(-2,-2).apply{gravity=if(info)Gravity.CENTER_HORIZONTAL else if(user)Gravity.END else Gravity.START;setMargins(dp(2),dp(3),dp(2),dp(3))}
+        messages.addView(wrapper,lp);scroll.post{scroll.fullScroll(View.FOCUS_DOWN)};return t
     }
     private fun showMenu(){
-        AlertDialog.Builder(this).setTitle("Busca Local").setItems(arrayOf("Selecionar modelo GGUF","Nova conversa","Fontes desta conversa")){_,which->
-            when(which){0->startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{type="*/*";addCategory(Intent.CATEGORY_OPENABLE)},7);1->{chat=store.create();renderChat()};2->showSources()}
+        AlertDialog.Builder(this).setTitle("Busca Local · v0.3.0").setItems(arrayOf("Selecionar modelo GGUF — "+modelLabel.text,"Nova conversa","Fontes desta conversa")){_,which->
+            when(which){0->startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{type="*/*";addCategory(Intent.CATEGORY_OPENABLE)},7);1->newChat();2->showSources()}
         }.setNegativeButton("Fechar",null).show()
     }
     private fun renderChat(){
         messages.removeAllViews()
         val all=store.messages(chat)
-        if(all.isEmpty())bubble("info","Faça uma busca para criar a base desta conversa. Depois use Conversar para perguntar sobre as fontes salvas, mesmo sem internet.")
+        if(all.isEmpty())bubble("info","Toque no globo para pesquisar via Tor. Use a seta para conversar com a IA local sobre as fontes salvas.")
         else all.forEach{bubble(it.role,it.body)}
         headerTitle.text=store.chats().firstOrNull{it.id==chat}?.title ?: "Busca Local"
-        status.text=store.sources(chat).size.toString()+" fontes salvas"
-        sources.text=store.sources(chat).size.toString()+" ▤"
+        status.text=""
+        sources.contentDescription="Fontes desta conversa: "+store.sourceCount(chat)
         getPreferences(MODE_PRIVATE).edit().putLong("chat",chat).apply()
     }
     private fun showChats(){
@@ -211,9 +304,9 @@ class MainActivity : Activity() {
     private fun runTurn(web:Boolean){
         if(busy)return
         val q=query.text.toString().trim()
-        if(q.isBlank() || q.length>500){status.text="Digite uma pergunta de até 500 caracteres";return}
-        if(web && !torReady){status.text="Tor indisponível; nenhuma conexão direta.";return}
-        if(!web && modelFile==null){status.text="Importe um GGUF primeiro.";return}
+        if(q.isBlank() || q.length>500){status.text="Digite uma pergunta de até 500 caracteres";status.visibility=View.VISIBLE;return}
+        if(web && !torReady){status.text="Tor indisponível; nenhuma conexão direta.";status.visibility=View.VISIBLE;return}
+        if(!web && modelFile==null){status.text="Importe um GGUF primeiro.";status.visibility=View.VISIBLE;return}
         val id=chat
         val previous=store.messages(id)
         if(previous.none{it.role=="user"||it.role=="search"})store.rename(id,q)
@@ -295,7 +388,7 @@ class MainActivity : Activity() {
             }finally{
                 val pending=research;research=null
                 withContext(NonCancellable+Dispatchers.IO){pending?.close()}
-                busy=false;refresh();sources.text=store.sources(id).size.toString()+" ▤";scroll.post{scroll.fullScroll(View.FOCUS_DOWN)}
+                busy=false;refresh();sources.contentDescription="Fontes desta conversa: "+store.sourceCount(id);scroll.post{scroll.fullScroll(View.FOCUS_DOWN)}
             }
         }
     }

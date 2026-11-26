@@ -1,4 +1,4 @@
-# Buscador Local v0.2.1
+# Buscador Local v0.3.0
 Android ARM64 (11+), DuckDuckGo HTML, Tor incorporado obrigatório e GGUF local. Motor reutilizado do LFM3Local no commit 0e196e8831220b782cc78535b6d6729940169373. Sem servidor de inferência, conta ou Orbot. Modelo não incluído no APK. Sem modelo, busca e salva resultados e fontes. Com modelo, permite síntese e perguntas subsequentes. Não suporta PDFs ou sites dependentes de JavaScript. Não é uma ferramenta de anonimato auditada: verificar vazamentos DNS/IP e conexão real no aparelho. CAPTCHA ou bloqueio interrompem a pesquisa, sem fallback direto. Consultas são enviadas ao DuckDuckGo. Fontes são dados não confiáveis; citações e respostas exigem conferência.
 
 ## Build
@@ -31,3 +31,8 @@ A compilação 03 confirmou disponibilidade de SDK 37.2 e identificou incompatib
 - Aguarda inicialização do motor antes de carregar GGUF e registra etapa, tipo e stack trace de falhas via adb logcat -s BuscaLocal.
 - Cabeçalho compacto, bolhas alinhadas, compositor fixo, ações de envio local, busca Tor e parada; fontes e modelos acessíveis no cabeçalho. Mantém SQLite e package ID. Testar no aparelho, incluindo cancelar busca, reabrir conversa e conversar offline.
 - Causa exata do erro reportado não confirmada sem stack trace de dispositivo; build não comprova execução em smartphone.
+
+## v0.3.0 — interface de mensageiro
+- Tela dedicada de conversas com prévia de mensagens, avatar e contagem de fontes; acesso pelo ícone voltar. Identificação visível da versão na tela de conversas e no menu.
+- Cabeçalho branco, ícones desenhados em vetor, balões assimétricos, compositor em uma linha com globo de busca e envio circular. Indicadores técnicos aparecem durante o processamento e erros; modelo no menu. Resultados da busca condensados visualmente, mantendo fontes e histórico no SQLite.
+- Insets de barras e teclado tratados explicitamente. Sem alteração do banco ou motor. CI verifica versionName do APK. Não há captura de tela real nem execução física nesta infraestrutura.
