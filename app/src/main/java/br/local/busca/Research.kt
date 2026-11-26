@@ -60,10 +60,8 @@ internal class Research(port: Int) {
         val doc = Jsoup.parse(html, finalUrl.toString())
         doc.select("script,style,nav,footer,header,aside,form,noscript,iframe").remove()
         val root = doc.selectFirst("article,main,[role=main]") ?: doc.body()
-        val terms = query.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length > 2 }.toSet()
         val paras = root.select("p,li,h1,h2,h3").map { it.text() }.filter { it.length >= 35 }.distinct()
-        val ranked = paras.sortedByDescending { p -> terms.count { p.lowercase().contains(it) } }
-        val passage = (if (ranked.isEmpty()) root.text() else ranked.take(8).joinToString("\n")).take(1700)
+        val passage = (if (paras.isEmpty()) root.text() else paras.joinToString("\n")).take(24000)
         if (passage.isBlank()) throw IOException("Sem texto extraído")
         return Evidence(hit.copy(url = finalUrl), passage)
     }
